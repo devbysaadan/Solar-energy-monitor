@@ -48,6 +48,7 @@ class _EnergyFlowDiagramState extends State<EnergyFlowDiagram> with SingleTicker
                   painter: _FlowPainter(
                     animationValue: _controller.value,
                     stats: provider.stats,
+                    isAnimationEnabled: provider.isAnimationEnabled,
                   ),
                   child: child,
                 ),
@@ -124,8 +125,9 @@ class _FlowNodes extends StatelessWidget {
 class _FlowPainter extends CustomPainter {
   final double animationValue;
   final EnergyStats stats;
+  final bool isAnimationEnabled;
 
-  _FlowPainter({required this.animationValue, required this.stats});
+  _FlowPainter({required this.animationValue, required this.stats, required this.isAnimationEnabled});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -154,7 +156,7 @@ class _FlowPainter extends CustomPainter {
 
     // Helper to draw moving particles
     void drawParticles(Offset start, Offset end, Color color, double amount, bool reverse) {
-      if (amount <= 0) return;
+      if (amount <= 0 || !isAnimationEnabled) return;
       particlePaint.color = color;
       
       // Calculate 3 particles spaced apart

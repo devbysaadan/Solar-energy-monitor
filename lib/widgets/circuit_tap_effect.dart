@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/energy_provider.dart';
 import '../theme/app_theme.dart';
 
 class CircuitTapEffect extends StatefulWidget {
@@ -34,6 +36,12 @@ class _CircuitTapEffectState extends State<CircuitTapEffect> {
 
   @override
   Widget build(BuildContext context) {
+    final isAnimationEnabled = Provider.of<EnergyProvider>(context).isAnimationEnabled;
+
+    if (!isAnimationEnabled) {
+      return widget.child;
+    }
+
     return Listener(
       onPointerDown: (event) {
          _addSpark(event.position);

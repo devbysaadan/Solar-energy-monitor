@@ -1,5 +1,8 @@
 import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/energy_provider.dart';
 import '../theme/app_theme.dart';
 
 class ElectricBackground extends StatefulWidget {
@@ -13,46 +16,67 @@ class ElectricBackground extends StatefulWidget {
 class _ElectricBackgroundState extends State<ElectricBackground> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   final Random _random = Random();
-  List<Offset> _lightningPath1 = [];
-  List<Offset> _lightningPath2 = [];
+  Path _lightningPath = Path();
 
   @override
   void initState() {
     super.initState();
+    // Vastly slower, ambient 5-second cycle for premium heartbeat feel
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat(reverse: true);
+      duration: const Duration(seconds: 5),
+    )..addStatusListener((status) {
+       if (status == AnimationStatus.completed) {
+           _generateLightning();
+           _controller.forward(from: 0.0);
+       }
+    });
     
     _generateLightning();
+    _controller.forward();
   }
   
   void _generateLightning() {
-    _lightningPath1 = _createLightningPath();
-    _lightningPath2 = _createLightningPath();
-    
-    // Periodically generate new lightning positions every 2-5 seconds
-    Future.delayed(Duration(milliseconds: 10000 + _random.nextInt(20000)), () {
-      if (mounted) {
-        setState(() {
-          _generateLightning();
-        });
-      }
-    });
+    _lightningPath = _createLightningPath();
   }
 
-  List<Offset> _createLightningPath() {
-    List<Offset> path = [];
-    double currentX = _random.nextDouble() * 400; // rough screen width mapping
-    double currentY = -50; // start slightly above screen
-    path.add(Offset(currentX, currentY));
+  Path _createLightningPath() {
+    Path path = Path();
+    List<Offset> mainTrunk = [];
+    double currentX = _random.nextDouble() * 400; // rough screen width
+    double currentY = -50; 
+    mainTrunk.add(Offset(currentX, currentY));
     
-    while (currentY < 900) { // rough screen height mapping
-      currentY += _random.nextDouble() * 60 + 20; // jump down
-      currentX += (_random.nextDouble() - 0.5) * 100; // jagged left/right
-      path.add(Offset(currentX, currentY));
+    // Wider horizontal jumps for slow creeping lightning
+    while (currentY < 1000) { 
+      currentY += _random.nextDouble() * 60 + 30; 
+      currentX += (_random.nextDouble() - 0.5) * 120; 
+      mainTrunk.add(Offset(currentX, currentY));
+    }
+    
+    // Draw trunk smoothly
+    path.moveTo(mainTrunk.first.dx, mainTrunk.first.dy);
+    for (int i = 1; i < mainTrunk.length; i++) {
+       path.lineTo(mainTrunk[i].dx, mainTrunk[i].dy);
+       // Add organic sprawling branches 
+       if (_random.nextDouble() > 0.4) {
+           _addBranch(path, mainTrunk[i], (_random.nextDouble() - 0.5) * pi, 120);
+       }
     }
     return path;
+  }
+  
+  void _addBranch(Path path, Offset start, double angle, double length) {
+      double cx = start.dx;
+      double cy = start.dy;
+      path.moveTo(cx, cy);
+      int segments = 4;
+      for (int i=0; i<segments; i++) {
+          cx += cos(angle) * (length/segments) + (_random.nextDouble() - 0.5) * 20;
+          cy += sin(angle) * (length/segments) + (_random.nextDouble() - 0.5) * 20;
+          path.lineTo(cx, cy);
+          angle += (_random.nextDouble() - 0.5) * 0.5; // wander
+      }
   }
 
   @override
@@ -63,48 +87,49 @@ class _ElectricBackgroundState extends State<ElectricBackground> with SingleTick
 
   @override
   Widget build(BuildContext context) {
+    final isAnimationEnabled = Provider.of<EnergyProvider>(context).isAnimationEnabled;
+    if (!isAnimationEnabled) {
+      return Stack(
+        children: [
+          Container(color: AppTheme.background),
+          widget.child,
+        ],
+      );
+    }
+
     return Stack(
       children: [
         // Dark Base Color
         Container(color: AppTheme.background),
         
-        // Lightning Animation Layer 1
+        // Single Gorgeous Heartbeat Lightning Layer
         Positioned.fill(
           child: RepaintBoundary(
             child: AnimatedBuilder(
               animation: _controller,
               builder: (context, child) {
-                 // Fast flicker math
-                 double flicker = (_controller.value * 10) % 1.0; 
-                 // Base opacity with sudden bright flashes
-                 double opacity = (flicker > 0.8) ? 0.3 : 0.05;
                  
+                 // Phase 1 (0 to 0.4): Smoothly extract and draw downward
+                 double pathProgress = _controller.value < 0.4 
+                      ? Curves.easeOutCubic.transform(_controller.value / 0.4) 
+                      : 1.0;
+                      
+                 // Phase 2 (0.4 to 1.0): Heartbeat pulse and fade out
+                 double opacity = 1.0;
+                 if (_controller.value > 0.4) {
+                    double fadePhase = (_controller.value - 0.4) / 0.6; // normalized 0..1
+                    // A majestic double heartbeat logic (sin wave over 0 to 2pi -> 2 peaks)
+                    double pulse = (sin(fadePhase * pi * 4) + 1.0) / 2.0; 
+                    opacity = pulse * (1.0 - fadePhase * 0.8); // pulses while slowly fading
+                 } else {
+                    opacity = pathProgress; // ramps up beautifully with drawing
+                 }
+
                  return CustomPaint(
                    painter: _LightningPainter(
-                     pathPoints: _lightningPath1,
+                     path: _lightningPath,
+                     progress: pathProgress,
                      opacity: opacity,
-                     color: AppTheme.gridBlue,
-                   ),
-                 );
-              },
-            ),
-          ),
-        ),
-        
-        // Lightning Animation Layer 2
-        Positioned.fill(
-          child: RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                 double flicker = (_controller.value * 7) % 1.0; 
-                 double opacity = (flicker > 0.9) ? 0.25 : 0.02;
-                 
-                 return CustomPaint(
-                   painter: _LightningPainter(
-                     pathPoints: _lightningPath2,
-                     opacity: opacity,
-                     color: AppTheme.solarGreen,
                    ),
                  );
               },
@@ -120,42 +145,60 @@ class _ElectricBackgroundState extends State<ElectricBackground> with SingleTick
 }
 
 class _LightningPainter extends CustomPainter {
-  final List<Offset> pathPoints;
+  final Path path;
+  final double progress;
   final double opacity;
-  final Color color;
 
-  _LightningPainter({required this.pathPoints, required this.opacity, required this.color});
+  _LightningPainter({required this.path, required this.progress, required this.opacity});
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (pathPoints.isEmpty) return;
+    if (opacity < 0.01 || progress < 0.01) return; 
 
-    final glowPaint = Paint()
-      ..color = color.withOpacity(opacity)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..maskFilter = const MaskFilter.blur(BlurStyle.outer, 15.0); // Powerful glow
-      
-    final corePaint = Paint()
-      ..color = Colors.white.withOpacity(opacity > 0.1 ? opacity + 0.5 : opacity)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
+    // Scale gracefully to actual device screen size
+    final m1 = Matrix4.identity();
+    m1.scale(size.width / 400.0, size.height / 900.0);
+    final scaledPath = path.transform(m1.storage);
 
-    final path = Path();
-    path.moveTo((pathPoints.first.dx / 400.0) * size.width, pathPoints.first.dy);
-    
-    for (int i = 1; i < pathPoints.length; i++) {
-       double sx = (pathPoints[i].dx / 400.0) * size.width;
-       double sy = (pathPoints[i].dy / 900.0) * size.height;
-       path.lineTo(sx, sy);
+    // Smoothly draw path out using PathMetrics
+    Path animatedPath = Path();
+    for (PathMetric metric in scaledPath.computeMetrics()) {
+       animatedPath.addPath(metric.extractPath(0.0, metric.length * progress), Offset.zero);
     }
 
-    canvas.drawPath(path, glowPaint);
-    canvas.drawPath(path, corePaint);
+    // 1. Massive localized ambient blue background exactly under the lightning!
+    final ambientCloudPaint = Paint()
+      ..color = AppTheme.gridBlue.withOpacity(opacity * 0.45) // deep blue clouds
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 120.0 // Fills the background wherever lightning touches
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 80.0);
+
+    // 2. Focused aura surrounding the bolt
+    final glowPaint = Paint()
+      ..color = AppTheme.gridBlue.withOpacity(opacity)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5.0
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10.0);
+      
+    // 3. Sharp super-bright core
+    final corePaint = Paint()
+      ..color = Colors.white.withOpacity(opacity > 0.1 ? opacity + 0.2 : opacity)
+      ..style = PaintingStyle.stroke
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 1.0;
+
+    canvas.drawPath(animatedPath, ambientCloudPaint);
+    canvas.drawPath(animatedPath, glowPaint);
+    canvas.drawPath(animatedPath, corePaint);
   }
 
   @override
   bool shouldRepaint(covariant _LightningPainter oldDelegate) {
-    return oldDelegate.opacity != opacity || oldDelegate.pathPoints != pathPoints;
+    return oldDelegate.progress != progress || oldDelegate.opacity != opacity || oldDelegate.path != path;
   }
 }

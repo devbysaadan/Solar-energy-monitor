@@ -28,7 +28,39 @@ class HomeScreen extends StatelessWidget {
             actions: [
               IconButton(
                 icon: const Icon(LucideIcons.settings),
-                onPressed: () {},
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    backgroundColor: AppTheme.surface,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    builder: (context) => Consumer<EnergyProvider>(
+                      builder: (context, provider, child) {
+                        return Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Settings', style: Theme.of(context).textTheme.titleLarge),
+                              const SizedBox(height: 16),
+                              SwitchListTile(
+                                title: const Text('Enable Ambient Animations'),
+                                subtitle: const Text('Toggle live energy flows and lighting effects'),
+                                activeColor: AppTheme.solarGreen,
+                                contentPadding: EdgeInsets.zero,
+                                value: provider.isAnimationEnabled,
+                                onChanged: (val) => provider.toggleAnimation(val),
+                              ),
+                              const SizedBox(height: 40),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
               )
             ],
           ),

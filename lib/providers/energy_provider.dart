@@ -15,11 +15,19 @@ class EnergyProvider with ChangeNotifier {
   String _selectedRange = 'Day';
   String get selectedRange => _selectedRange;
 
+  bool _isAnimationEnabled = true;
+  bool get isAnimationEnabled => _isAnimationEnabled;
+
   StreamSubscription<EnergyStats>? _subscription;
 
   EnergyProvider() {
     _startListening();
     fetchHistoricalData(_selectedRange);
+  }
+
+  void toggleAnimation(bool value) {
+    _isAnimationEnabled = value;
+    notifyListeners();
   }
 
   void _startListening() {
