@@ -9,24 +9,30 @@ import '../widgets/historical_chart.dart';
 import '../widgets/impact_metrics.dart';
 import '../widgets/system_notifications.dart';
 
+import '../widgets/electric_background.dart';
+import '../widgets/circuit_tap_effect.dart';
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Solar Energy', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.settings),
-            onPressed: () {},
-          )
-        ],
-      ),
-      body: Consumer<EnergyProvider>(
+    return CircuitTapEffect(
+      child: ElectricBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            title: const Text('Solar Energy', style: TextStyle(fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            actions: [
+              IconButton(
+                icon: const Icon(LucideIcons.settings),
+                onPressed: () {},
+              )
+            ],
+          ),
+          body: Consumer<EnergyProvider>(
         builder: (context, provider, child) {
           final stats = provider.stats;
 
@@ -100,6 +106,6 @@ class HomeScreen extends StatelessWidget {
           );
         },
       ),
-    );
+    )));
   }
 }
